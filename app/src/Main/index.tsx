@@ -1,5 +1,4 @@
 import { ActivityIndicator } from 'react-native';
-import axios from 'axios';
 import {
   Container,
   CategoriesContainer,
@@ -19,24 +18,39 @@ import { Product } from '../types/Product';
 import { Empty } from '../components/Icons/Empty';
 import { Text } from '../components/Text';
 import { Category } from '../types/Category';
+import { api } from '../utils/api';
 
 export function Main(){
   const [isTableModalVisible, setIsTableModalVisible] = useState(false);
   const [selectedTable, setSelectedTable] = useState('');
   const [cartItems, setCartItems] = useState<CartItemProps[]>([]);
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   useEffect(() => {
-    axios.get('http://192.168.1.13:3001/categories')
-      .then((response) => setCategories(response.data))
-      .catch(error => console.log(error));
-
-    axios.get('http://192.168.1.13:3001/products')
-      .then((response) => setProducts(response.data))
-      .catch(error => console.log(error));
+    Promise.all([
+      api.get('/categories'),
+      api.get('/products')
+    ]).then(([categoriesResponse, productsResponse]) => {
+      setCategories(categoriesResponse.data);
+      setProducts(productsResponse.data);
+      setIsLoading(false);
+    });
   }, []);
+
+  //filtering if the category is selected or not and showing the products
+  async function handleSelectCategory(categoryId: string){
+    const route = !categoryId
+      ? '/products'
+      : `/categories/${categoryId}/products`;
+
+    setIsLoadingProducts(true);
+    const {data} = await api.get(route);
+    setProducts(data);
+    setIsLoadingProducts(false);
+  }
 
   function handleSaveTable(table: string){
     setSelectedTable(table);
@@ -112,6 +126,7 @@ export function Main(){
           onCancelOrder={handleResetOrder}
         />
 
+        {/* Loading elemento for the whole application */}
         {isLoading ? (
           <CenteredContainer>
             <ActivityIndicator color="#D73035" size="large"/>
@@ -121,24 +136,34 @@ export function Main(){
             <CategoriesContainer>
               <Categories
                 categories={categories}
+                onSelectCategory={handleSelectCategory}
               />
             </CategoriesContainer>
 
-            {products.length > 0 ? (
-              <MenuContainer>
-                <Menu
-                  onAddToCart={handleAddToCart}
-                  products={products}
-                />
-              </MenuContainer>
-            ): (
+            {/* Just showing the loading after change the category */}
+            {isLoadingProducts ? (
               <CenteredContainer>
-                <Empty />
-
-                <Text color="#666" style={{marginTop: 24}}>
-                  Nenhum produto foi encontrado
-                </Text>
+                <ActivityIndicator color="#D73035" size="large"/>
               </CenteredContainer>
+            ): (
+              <>
+                {products.length > 0 ? (
+                  <MenuContainer>
+                    <Menu
+                      onAddToCart={handleAddToCart}
+                      products={products}
+                    />
+                  </MenuContainer>
+                ): (
+                  <CenteredContainer>
+                    <Empty />
+
+                    <Text color="#666" style={{marginTop: 24}}>
+                Nenhum produto foi encontrado
+                    </Text>
+                  </CenteredContainer>
+                )}
+              </>
             )}
           </>
         }
@@ -161,6 +186,7 @@ export function Main(){
               onAdd={handleAddToCart}
               onDecrement={handleDecrementCartItem}
               onConfirmOrder={handleResetOrder}
+              selectedTable={selectedTable}
             />
           )}
         </FooterContainer>
