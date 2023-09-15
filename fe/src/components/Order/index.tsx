@@ -3,14 +3,24 @@ import {OrdersBoard} from './OrdersBoard/index';
 import { Order } from '../../types/Orders';
 import { useEffect, useState } from 'react';
 import { api } from '../../utils/api';
+import socketIo  from 'socket.io-client';
 
 export function Orders(){
-  const [orders, setOders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    const socket = socketIo('http://localhost:3001', {
+      transports: ['websocket'],
+    });
+    socket.on('newOrder', (orders) => {
+      setOrders((prevState) => prevState.concat(orders));
+    })
+  }, []);
 
   useEffect(() => {
     api.get('/orders')
     .then(({ data }) => {
-      setOders(data);
+      setOrders(data);
     });
   }, []);
 
@@ -19,11 +29,11 @@ export function Orders(){
   const done = orders.filter((order) => order.status === 'DONE');
 
   function handleCancelOrder(orderId: string){
-    setOders((prevState) => prevState.filter((order) => order._id !== orderId));
+    setOrders((prevState) => prevState.filter((order) => order._id !== orderId));
   }
 
   function handleOrderStatusChange(orderId: string, status: Order['status']){
-    setOders((prevState) => prevState.map((order) => (
+    setOrders((prevState) => prevState.map((order) => (
       order._id === orderId
       ? {...order, status}
       : order
